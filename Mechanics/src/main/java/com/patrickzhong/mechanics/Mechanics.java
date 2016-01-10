@@ -89,11 +89,11 @@ public class Mechanics extends JavaPlugin implements Listener{
 							double y = yPos(velocity, yaw, pitch, time[0], loc[0].getY(), 2);
 							double z = xPos(velocity, yaw, pitch, time[0], loc[0].getZ());
 							Location newLoc = new Location(player.getWorld(), x, y, z);
-							player.getWorld().playEffect(newLoc, Effect.SMOKE, 0);
+							player.getWorld().playEffect(newLoc, Effect.MOBSPAWNER_FLAMES, 0);
 							time[0] = time[0] + 1;
 							loc[0] = newLoc;
 						}
-					}.runTaskTimer(this, 0, 20);
+					}.runTaskTimer(this, 0, 10);
 				}else {
 					timer.cancel();
 				}
@@ -122,6 +122,6 @@ public class Mechanics extends JavaPlugin implements Listener{
 	}
 	
 	private double zPos(double velocity, double yaw, double pitch, double time, double initialZ){
-		return velocity * Math.cos(pitch) * time * Math.cos(yaw) + initialZ;
+		return -1 * velocity * Math.cos(pitch) * time * Math.cos(yaw) + initialZ;
 	}
 }

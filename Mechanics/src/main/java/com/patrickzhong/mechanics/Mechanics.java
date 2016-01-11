@@ -1,5 +1,7 @@
 package com.patrickzhong.mechanics;
 
+import java.util.List;
+
 import org.bukkit.Bukkit;
 import org.bukkit.Effect;
 import org.bukkit.Location;
@@ -80,49 +82,55 @@ public class Mechanics extends JavaPlugin implements Listener{
 		if(ev.getAction().equals(Action.LEFT_CLICK_AIR)){
 			final Player player = ev.getPlayer();
 			ItemStack hand = player.getInventory().getItemInHand();
-			if(hand == null || !hand.hasItemMeta() || !hand.getItemMeta().hasDisplayName())
+			if(hand == null || !hand.getType().equals(Material.STICK) || !hand.hasItemMeta() || !hand.getItemMeta().hasLore())
 				return;
-			if(hand.getItemMeta().getDisplayName().contains("MAGE STICKEY TEST")){
-				final Double[] time = new Double[1];
-				final Location[] loc = new Location[1];
-				time[0] = 0.0;
-				loc[0] = player.getLocation();
-				final Location location = loc[0];
-				final double yaw = loc[0].getYaw();
-				final double pitch = loc[0].getPitch();
-				final long period = 1;
-				final double range = 30;
-				final double velocity = 20; // Blocks per two seconds
-				timer = new BukkitRunnable(){
-					public void run(){
-						double x = xPos(velocity, yaw, pitch, time[0], loc[0].getX());
-						double y = yPos(velocity, yaw, pitch, time[0], loc[0].getY(), -2);
-						double z = zPos(velocity, yaw, pitch, time[0], loc[0].getZ());
-						Location newLoc = new Location(player.getWorld(), x, y, z);
-						
-						if(!newLoc.getWorld().getBlockAt(newLoc).getType().equals(Material.AIR))
-							this.cancel();
-						
-						for(Entity ent : newLoc.getChunk().getEntities()){
-							if(!ent.equals(player)){
-								Location entLoc = ent.getLocation();
-								boolean closeX = (x <= entLoc.getX()+0.5 && x >= entLoc.getX()-0.5);
-								boolean closeY = (y <= entLoc.getY()+2 && y >= entLoc.getY());
-								boolean closeZ = (z <= entLoc.getZ()+0.5 && z >= entLoc.getZ()-0.5);
-								if(closeX && closeY && closeZ){
-									((Damageable)ent).damage(2);
-									this.cancel();
+			List<String> lores = hand.getItemMeta().getLore();
+			for(int a = 0; a < lores.size(); a++){
+				if(lores.get(a).contains("Attack")){
+					ev.setCancelled(true);
+					final Double[] time = new Double[1];
+					final Location[] loc = new Location[1];
+					time[0] = 0.0;
+					final Location location = player.getLocation();
+					loc[0] = new Location(loc[0].getWorld(), loc[0].getX(), loc[0].getY()+0.75, loc[0].getZ());
+					
+					final double yaw = loc[0].getYaw();
+					final double pitch = loc[0].getPitch();
+					final long period = 1;
+					final double range = 30;
+					final double velocity = 20; // Blocks per two seconds
+					timer = new BukkitRunnable(){
+						public void run(){
+							double x = xPos(velocity, yaw, pitch, time[0], loc[0].getX());
+							double y = yPos(velocity, yaw, pitch, time[0], loc[0].getY(), -2);
+							double z = zPos(velocity, yaw, pitch, time[0], loc[0].getZ());
+							Location newLoc = new Location(player.getWorld(), x, y, z);
+							
+							if(!newLoc.getWorld().getBlockAt(newLoc).getType().equals(Material.AIR))
+								this.cancel();
+							
+							for(Entity ent : newLoc.getChunk().getEntities()){
+								if(!ent.equals(player)){
+									Location entLoc = ent.getLocation();
+									boolean closeX = (x <= entLoc.getX()+0.5 && x >= entLoc.getX()-0.5);
+									boolean closeY = (y <= entLoc.getY()+2 && y >= entLoc.getY());
+									boolean closeZ = (z <= entLoc.getZ()+0.5 && z >= entLoc.getZ()-0.5);
+									if(closeX && closeY && closeZ){
+										((Damageable)ent).damage(2);
+										this.cancel();
+									}
 								}
 							}
+								
+							newLoc.getWorld().playEffect(newLoc, Effect.POTION_BREAK, 8204);
+							time[0] = time[0] + period/20.0;
+							if(Math.sqrt(Math.pow(location.getX()-x, 2)+Math.pow(location.getZ()-z, 2)) >= range)
+								this.cancel();
 						}
-							
-						newLoc.getWorld().playEffect(newLoc, Effect.POTION_BREAK, 8204);
-						time[0] = time[0] + period/20.0;
-						if(Math.sqrt(Math.pow(location.getX()-x, 2)+Math.pow(location.getZ()-z, 2)) >= range)
-							this.cancel();
-					}
-				}.runTaskTimer(this, 0, period);
-			
+					}.runTaskTimer(this, 0, period);
+					
+					return;
+				}
 			}
 		}
 	}

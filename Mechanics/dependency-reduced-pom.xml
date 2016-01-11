@@ -39,10 +39,6 @@
       <id>bukkit-repo</id>
       <url>http://repo.bukkit.org/content/groups/public/</url>
     </repository>
-    <repository>
-      <id>sinndev-repo</id>
-      <url>http://repo.sinndev.com/content/groups/public/</url>
-    </repository>
   </repositories>
   <dependencies>
     <dependency>
@@ -50,6 +46,13 @@
       <artifactId>bukkit</artifactId>
       <version>1.7.9-R0.2</version>
       <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.spigotmc</groupId>
+      <artifactId>spigot</artifactId>
+      <version>1.8.8</version>
+      <scope>system</scope>
+      <systemPath>C:/Users/Patrick/Downloads/spigot-1.8.8.jar</systemPath>
     </dependency>
   </dependencies>
 </project>

@@ -40,10 +40,6 @@
          <id>bukkit-repo</id>
          <url>http://repo.bukkit.org/content/groups/public/</url>
        </repository>
-       <repository>
-            <id>sinndev-repo</id>
-            <url>http://repo.sinndev.com/content/groups/public/</url>
-        </repository>
    </repositories>
    <dependencies>
        <dependency>
@@ -53,9 +49,11 @@
            <scope>provided</scope>
        </dependency>
        <dependency>
-            <groupId>com.darkblade12</groupId>
-            <artifactId>particleeffect</artifactId>
-            <version>1.7</version>
-        </dependency>
+           <groupId>org.spigotmc</groupId>
+           <artifactId>spigot</artifactId>
+           <version>1.8.8</version>
+           <systemPath>C:/Users/Patrick/Downloads/spigot-1.8.8.jar</systemPath>
+           <scope>system</scope>
+       </dependency>
    </dependencies>
 </project>

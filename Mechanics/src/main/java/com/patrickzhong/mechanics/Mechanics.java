@@ -98,7 +98,7 @@ public class Mechanics extends JavaPlugin implements Listener{
 					final double yaw = loc[0].getYaw();
 					final double pitch = loc[0].getPitch();
 					final long period = 1;
-					final double range = 30;
+					final double range = 10;
 					final double velocity = 20; // Blocks per two seconds
 					timer = new BukkitRunnable(){
 						public void run(){

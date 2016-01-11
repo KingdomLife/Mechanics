@@ -93,7 +93,7 @@ public class Mechanics extends JavaPlugin implements Listener{
 					final Location[] loc = new Location[1];
 					time[0] = 0.0;
 					final Location location = player.getLocation();
-					loc[0] = new Location(loc[0].getWorld(), loc[0].getX(), loc[0].getY()+0.75, loc[0].getZ());
+					loc[0] = new Location(loc[0].getWorld(), location.getX(), location.getY()+0.75, location.getZ());
 					
 					final double yaw = loc[0].getYaw();
 					final double pitch = loc[0].getPitch();

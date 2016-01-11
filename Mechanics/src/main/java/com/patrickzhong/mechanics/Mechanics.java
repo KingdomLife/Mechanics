@@ -3,6 +3,7 @@ package com.patrickzhong.mechanics;
 import java.util.List;
 
 import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
 import org.bukkit.Effect;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -86,7 +87,7 @@ public class Mechanics extends JavaPlugin implements Listener{
 				return;
 			List<String> lores = hand.getItemMeta().getLore();
 			for(int a = 0; a < lores.size(); a++){
-				if(lores.get(a).contains("Attack")){
+				if(ChatColor.stripColor(lores.get(a)).contains("Attack")){
 					ev.setCancelled(true);
 					final Double[] time = new Double[1];
 					final Location[] loc = new Location[1];

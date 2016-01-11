@@ -100,22 +100,23 @@ public class Mechanics extends JavaPlugin implements Listener{
 						double z = zPos(velocity, yaw, pitch, time[0], loc[0].getZ());
 						Location newLoc = new Location(player.getWorld(), x, y, z);
 						
-						/*if(!newLoc.getWorld().getBlockAt(newLoc).getType().equals(Material.AIR))
+						if(!newLoc.getWorld().getBlockAt(newLoc).getType().equals(Material.AIR))
 							this.cancel();
 						
 						for(Entity ent : newLoc.getChunk().getEntities()){
-							Location entLoc = ent.getLocation();
-							boolean closeX = (x <= entLoc.getX()+0.5 && x >= entLoc.getX()-0.5);
-							boolean closeY = (y <= entLoc.getY()+2 && y >= entLoc.getY());
-							boolean closeZ = (z <= entLoc.getZ()+0.5 && z >= entLoc.getZ()-0.5);
-							if(closeX && closeY && closeZ){
-								((Damageable)ent).damage(2);
-								this.cancel();
+							if(!ent.equals(player)){
+								Location entLoc = ent.getLocation();
+								boolean closeX = (x <= entLoc.getX()+0.5 && x >= entLoc.getX()-0.5);
+								boolean closeY = (y <= entLoc.getY()+2 && y >= entLoc.getY());
+								boolean closeZ = (z <= entLoc.getZ()+0.5 && z >= entLoc.getZ()-0.5);
+								if(closeX && closeY && closeZ){
+									((Damageable)ent).damage(2);
+									this.cancel();
+								}
 							}
-						}*/
+						}
 							
-						
-						newLoc.getWorld().playEffect(newLoc, Effect.MOBSPAWNER_FLAMES, 0);
+						newLoc.getWorld().playEffect(newLoc, Effect.POTION_BREAK, 8204);
 						time[0] = time[0] + period/20.0;
 						if(Math.sqrt(Math.pow(location.getX()-x, 2)+Math.pow(location.getZ()-z, 2)) >= range)
 							this.cancel();

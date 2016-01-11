@@ -3,7 +3,9 @@ package com.patrickzhong.mechanics;
 import org.bukkit.Bukkit;
 import org.bukkit.Effect;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.entity.Arrow;
+import org.bukkit.entity.Damageable;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -24,7 +26,7 @@ import org.bukkit.scheduler.BukkitTask;
 public class Mechanics extends JavaPlugin implements Listener{
 	Plugin plugin;
 	BukkitTask timer;
-	
+	BukkitTask healCoolTimer;
 	
 	public void onEnable(){
 		this.getServer().getPluginManager().registerEvents(this, this);
@@ -56,13 +58,20 @@ public class Mechanics extends JavaPlugin implements Listener{
 	public void onPlayerHurt(EntityDamageEvent ev){
 		if(ev.getEntity() instanceof Player){
 			final Player player = (Player) ev.getEntity();
-			player.setMetadata("healCool", new FixedMetadataValue(this, false));
 			
-			new BukkitRunnable(){
+			if(healCoolTimer == null)
+				player.setMetadata("healCool", new FixedMetadataValue(this, false));
+			else
+				healCoolTimer.cancel();
+			
+			healCoolTimer = new BukkitRunnable(){
 				public void run(){
 					player.setMetadata("healCool", new FixedMetadataValue(plugin, true));
+					healCoolTimer = null;
+					this.cancel();
 				}
 			}.runTaskLater(this, 100);
+			
 		}
 	}
 	
@@ -74,29 +83,45 @@ public class Mechanics extends JavaPlugin implements Listener{
 			if(hand == null || !hand.hasItemMeta() || !hand.getItemMeta().hasDisplayName())
 				return;
 			if(hand.getItemMeta().getDisplayName().contains("MAGE STICKEY TEST")){
-				if(!player.hasMetadata("mageOn") || !player.getMetadata("mageOn").get(0).asBoolean()){
-					final Double[] time = new Double[1];
-					final Location[] loc = new Location[1];
-					time[0] = 0.0;
-					loc[0] = player.getLocation();
-					final double yaw = loc[0].getYaw();
-					final double pitch = loc[0].getPitch();
-					
-					final double velocity = 1;
-					timer = new BukkitRunnable(){
-						public void run(){
-							double x = xPos(velocity, yaw, pitch, time[0], loc[0].getX());
-							double y = yPos(velocity, yaw, pitch, time[0], loc[0].getY(), 2);
-							double z = xPos(velocity, yaw, pitch, time[0], loc[0].getZ());
-							Location newLoc = new Location(player.getWorld(), x, y, z);
-							player.getWorld().playEffect(newLoc, Effect.MOBSPAWNER_FLAMES, 0);
-							time[0] = time[0] + 1;
-							loc[0] = newLoc;
+				final Double[] time = new Double[1];
+				final Location[] loc = new Location[1];
+				time[0] = 0.0;
+				loc[0] = player.getLocation();
+				final Location location = loc[0];
+				final double yaw = loc[0].getYaw();
+				final double pitch = loc[0].getPitch();
+				final long period = 1;
+				final double range = 30;
+				final double velocity = 20; // Blocks per two seconds
+				timer = new BukkitRunnable(){
+					public void run(){
+						double x = xPos(velocity, yaw, pitch, time[0], loc[0].getX());
+						double y = yPos(velocity, yaw, pitch, time[0], loc[0].getY(), -2);
+						double z = zPos(velocity, yaw, pitch, time[0], loc[0].getZ());
+						Location newLoc = new Location(player.getWorld(), x, y, z);
+						
+						if(!newLoc.getWorld().getBlockAt(newLoc).getType().equals(Material.AIR))
+							this.cancel();
+						
+						for(Entity ent : newLoc.getChunk().getEntities()){
+							Location entLoc = ent.getLocation();
+							boolean closeX = (x <= entLoc.getX()+0.5 && x >= entLoc.getX()-0.5);
+							boolean closeY = (y <= entLoc.getY()+2 && y >= entLoc.getY());
+							boolean closeZ = (z <= entLoc.getZ()+0.5 && z >= entLoc.getZ()-0.5);
+							if(closeX && closeY && closeZ){
+								((Damageable)ent).damage(2);
+								this.cancel();
+							}
 						}
-					}.runTaskTimer(this, 0, 10);
-				}else {
-					timer.cancel();
-				}
+							
+						
+						newLoc.getWorld().playEffect(newLoc, Effect.MOBSPAWNER_FLAMES, 0);
+						time[0] = time[0] + period/20.0;
+						if(Math.sqrt(Math.pow(location.getX()-x, 2)+Math.pow(location.getZ()-z, 2)) >= range)
+							this.cancel();
+					}
+				}.runTaskTimer(this, 0, period);
+			
 			}
 		}
 	}
@@ -104,7 +129,7 @@ public class Mechanics extends JavaPlugin implements Listener{
 	private void heal(){
 		Player[] playerList = Bukkit.getServer().getOnlinePlayers();
 		for(Player player: playerList){
-			if(!player.hasMetadata("healCool") || player.getMetadata("healCool").get(0).asBoolean()){
+			if(!player.hasMetadata("healCool") || player.getMetadata("healCool").size() == 0 || player.getMetadata("healCool").get(0).asBoolean()){
 				if(player.getHealth() >= 0.9*player.getMaxHealth())
 					player.setHealth(player.getMaxHealth());
 				else
@@ -114,14 +139,14 @@ public class Mechanics extends JavaPlugin implements Listener{
 	}
 	
 	private double xPos(double velocity, double yaw, double pitch, double time, double initialX){
-		return -1 * velocity * Math.cos(pitch) * time * Math.sin(yaw) + initialX;
+		return -1 * velocity * Math.cos(Math.PI/180*pitch) * time * Math.sin(Math.PI/180*yaw) + initialX;
 	}
 	
 	private double yPos(double velocity, double yaw, double pitch, double time, double initialY, double gravity){
-		return 1/2 * gravity * Math.pow(time, 2) - velocity * Math.sin(pitch) * time + initialY;
+		return 0.5 * gravity * Math.pow(time, 2) - velocity * Math.sin(Math.PI/180*pitch) * time + initialY;
 	}
 	
 	private double zPos(double velocity, double yaw, double pitch, double time, double initialZ){
-		return -1 * velocity * Math.cos(pitch) * time * Math.cos(yaw) + initialZ;
+		return velocity * Math.cos(Math.PI/180*pitch) * time * Math.cos(Math.PI/180*yaw) + initialZ;
 	}
 }

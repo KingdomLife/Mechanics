@@ -100,7 +100,7 @@ public class Mechanics extends JavaPlugin implements Listener{
 						double z = zPos(velocity, yaw, pitch, time[0], loc[0].getZ());
 						Location newLoc = new Location(player.getWorld(), x, y, z);
 						
-						if(!newLoc.getWorld().getBlockAt(newLoc).getType().equals(Material.AIR))
+						/*if(!newLoc.getWorld().getBlockAt(newLoc).getType().equals(Material.AIR))
 							this.cancel();
 						
 						for(Entity ent : newLoc.getChunk().getEntities()){
@@ -112,7 +112,7 @@ public class Mechanics extends JavaPlugin implements Listener{
 								((Damageable)ent).damage(2);
 								this.cancel();
 							}
-						}
+						}*/
 							
 						
 						newLoc.getWorld().playEffect(newLoc, Effect.MOBSPAWNER_FLAMES, 0);

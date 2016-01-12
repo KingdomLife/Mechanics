@@ -94,7 +94,8 @@ public class Mechanics extends JavaPlugin implements Listener{
 		for(int a = 0; a < lores.size(); a++){
 			if(lores.get(a).contains("Attack")){
 				ev.setCancelled(true);
-				createHelix(player);
+				EnumParticle[] particles = {EnumParticle.CLOUD, EnumParticle.CRIT_MAGIC, EnumParticle.FIREWORKS_SPARK, EnumParticle.FLAME, EnumParticle.SPELL_WITCH, EnumParticle.VILLAGER_HAPPY, EnumParticle.WATER_SPLASH};
+				createHelix(player, particles[(int)Math.floor(Math.random()*particles.length)]);
 				return;
 			}
 		}
@@ -125,7 +126,7 @@ public class Mechanics extends JavaPlugin implements Listener{
 		return velocity * Math.cos(Math.PI/180*pitch) * time * Math.cos(Math.PI/180*yaw) + initialZ;
 	}
 	
-	private void createHelix(final Player player) {
+	private void createHelix(final Player player, final EnumParticle particle) {
 		final Location loc = player.getLocation();
 		loc.add(0, 0.5, 0);
 		final Vector direction = player.getLocation().getDirection();
@@ -139,7 +140,7 @@ public class Mechanics extends JavaPlugin implements Listener{
 		    		double x = radius * Math.sin(time[0]) * Math.cos(Math.PI/180 * loc.getYaw());
 		    		double y = radius * Math.cos(time[0]);
 			        //double z = time[0];
-			        PacketPlayOutWorldParticles packet = new PacketPlayOutWorldParticles(EnumParticle.VILLAGER_HAPPY, true, (float) (center.getX() + x), (float) (center.getY() + y), (float) (center.getZ()), 0f, 0f, 0f, 0f, 1);
+			        PacketPlayOutWorldParticles packet = new PacketPlayOutWorldParticles(particle, true, (float) (center.getX() + x), (float) (center.getY() + y), (float) (center.getZ()), 0f, 0f, 0f, 0f, 1);
 			        for(Player online : Bukkit.getOnlinePlayers()) {
 			            ((CraftPlayer)online).getHandle().playerConnection.sendPacket(packet);
 			        }

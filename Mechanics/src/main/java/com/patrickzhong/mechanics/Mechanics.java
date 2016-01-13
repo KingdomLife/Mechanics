@@ -20,14 +20,20 @@ import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityRegainHealthEvent;
 import org.bukkit.event.entity.ProjectileHitEvent;
 import org.bukkit.event.entity.EntityRegainHealthEvent.RegainReason;
+import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerTeleportEvent;
+import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.metadata.FixedMetadataValue;
 import org.bukkit.plugin.Plugin;
+import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Vector;
+
+import com.patrickzhong.kingdomlifeapi.KingdomLifeAPI;
 
 import net.minecraft.server.v1_8_R3.EnumParticle;
 import net.minecraft.server.v1_8_R3.PacketPlayOutWorldParticles;
@@ -36,9 +42,11 @@ public class Mechanics extends JavaPlugin implements Listener{
 	Plugin plugin;
 	BukkitTask timer;
 	BukkitTask healCoolTimer;
+	private KingdomLifeAPI kLifeAPI;
 	
 	public void onEnable(){
 		this.getServer().getPluginManager().registerEvents(this, this);
+		
 		plugin = this;
 		
 		new BukkitRunnable(){
@@ -47,7 +55,28 @@ public class Mechanics extends JavaPlugin implements Listener{
 			}
 		}.runTaskTimer(this, 100, 100);
 		
-		getLogger().info("Mechanics enabled successfully.");
+		new BukkitRunnable(){
+			public void run(){
+				if (!setUpKingdomLifeAPI() ) {
+		            getLogger().severe(String.format("[%s] - Disabled due to no KingdomLifeAPI found!", getDescription().getName()));
+		            getServer().getPluginManager().disablePlugin(plugin);
+		            return;
+		        }
+				getLogger().info("Mechanics enabled successfully.");
+			}
+		}.runTaskLater(plugin, 1);
+	}
+	
+	private boolean setUpKingdomLifeAPI(){
+		if (getServer().getPluginManager().getPlugin("KingdomLifeAPI") == null) {
+            return false;
+        }
+        RegisteredServiceProvider<KingdomLifeAPI> rsp = getServer().getServicesManager().getRegistration(KingdomLifeAPI.class);
+        if (rsp == null) {
+            return false;
+        }
+        kLifeAPI = rsp.getProvider();
+        return kLifeAPI != null;
 	}
 	
 	@EventHandler
@@ -85,21 +114,91 @@ public class Mechanics extends JavaPlugin implements Listener{
 	}
 	
 	@EventHandler
+	public void onInvClose(InventoryCloseEvent ev){
+		Inventory inv = ev.getInventory();
+		if(inv.getTitle().equalsIgnoreCase("Character Selection") && kLifeAPI.type(ev.getPlayer().getUniqueId().toString()).equals(""))
+			ev.getPlayer().openInventory(inv);
+	}
+	
+	@EventHandler
 	public void onStickClick(PlayerInteractEvent ev){
 		final Player player = ev.getPlayer();
 		ItemStack hand = player.getInventory().getItemInHand();
 		if(hand == null || !hand.getType().equals(Material.STICK) || !hand.hasItemMeta() || !hand.getItemMeta().hasLore())
 			return;
 		List<String> lores = hand.getItemMeta().getLore();
+		int attack = 0;
 		for(int a = 0; a < lores.size(); a++){
-			if(lores.get(a).contains("Attack")){
-				ev.setCancelled(true);
-				EnumParticle[] particles = {EnumParticle.CLOUD, EnumParticle.CRIT_MAGIC, EnumParticle.FIREWORKS_SPARK, EnumParticle.FLAME, EnumParticle.SPELL_WITCH, EnumParticle.VILLAGER_HAPPY, EnumParticle.WATER_SPLASH};
-				createHelix(player, particles[(int)Math.floor(Math.random()*particles.length)]);
-				return;
+			String loreLine = ChatColor.stripColor(lores.get(a));
+			if(loreLine.contains("Attack")){
+				String attStr = loreLine.substring(loreLine.indexOf(":")+2);
+				if(!attStr.contains("-"))
+					attack = Integer.parseInt(attStr);
+				else {
+					int first = Integer.parseInt(attStr.split("-")[0]);
+					int last = Integer.parseInt(attStr.split("-")[1]);
+					attack = (int)Math.floor(Math.random()*(last-first+1)+first);
+				}
+					
+			}else if(loreLine.contains("Min. Level")){
+				int minLevel = Integer.parseInt(loreLine.substring(loreLine.indexOf(":")+2));
+				if(kLifeAPI.level(player.getUniqueId().toString(), kLifeAPI.type(player.getUniqueId().toString())) >= minLevel){
+					ev.setCancelled(true);
+					EnumParticle[] particles = {EnumParticle.CLOUD, EnumParticle.CRIT_MAGIC, EnumParticle.SPELL_WITCH, EnumParticle.VILLAGER_HAPPY};
+					createHelix(player, particles[(int)Math.floor(Math.random()*particles.length)], attack);
+					return;
+				}else {
+					player.sendMessage(ChatColor.RED+"You must be of level "+minLevel+" to use this weapon!");
+					return;
+				}
 			}
 		}
 	
+	}
+	
+	@EventHandler
+	public void onTeleport(PlayerTeleportEvent ev){
+		final Location loc = ev.getTo();
+		final double x = loc.getX();
+		final double y = loc.getY();
+		final double z = loc.getZ();
+		final double maxRadius = 4.0;
+		final Double[] time = {0.0};
+		
+		new BukkitRunnable(){
+			public void run(){
+				double radius = radius(time[0], maxRadius);
+				
+				for(double i = 0; i < Math.PI*2; i+=Math.PI/20){
+					float newX = (float)(xLoc(i, radius) + x);
+					float newY = (float)(y+maxRadius-time[0]);
+					float newZ = (float)(zLoc(i, radius) + z);
+					
+					if(radius == 0)
+						getLogger().info(newX+","+newY+","+newZ+",");
+					PacketPlayOutWorldParticles packet= new PacketPlayOutWorldParticles(EnumParticle.CRIT_MAGIC, true, newX, newY, newZ, 0f, 0f, 0f, 0f, 1);
+					for(Player player : Bukkit.getServer().getOnlinePlayers()){
+						((CraftPlayer)player).getHandle().playerConnection.sendPacket(packet);
+					}
+				}
+				
+				time[0] += 0.2;
+				if(radius >= maxRadius)
+					this.cancel();
+			}
+		}.runTaskTimer(plugin, 0, 2);
+	}
+	
+	private double xLoc(double time, double radius){
+		return Math.sin(time) * radius;
+	}
+	
+	private double zLoc(double time, double radius){
+		return Math.cos(time) * radius;
+	}
+	
+	private double radius(double time, double maxRadius){
+		return Math.sqrt(Math.pow(maxRadius,2) - Math.pow(time-maxRadius, 2));
 	}
 	
 	private void heal(){
@@ -126,12 +225,13 @@ public class Mechanics extends JavaPlugin implements Listener{
 		return velocity * Math.cos(Math.PI/180*pitch) * time * Math.cos(Math.PI/180*yaw) + initialZ;
 	}
 	
-	private void createHelix(final Player player, final EnumParticle particle) {
+	
+	private void createHelix(final Player player, final EnumParticle particle, final int damage) {
 		final Location loc = player.getLocation();
 		loc.add(0, 0.5, 0);
 		final Vector direction = player.getLocation().getDirection();
 	    final double radius = 0.25;
-	    final int range = 30;
+	    final int range = 7;
 	    final Double[] time = {0.0};
 	    new BukkitRunnable(){
 	    	public void run(){
@@ -155,14 +255,14 @@ public class Mechanics extends JavaPlugin implements Listener{
 							boolean closeY = ((center.getY() + y) <= entLoc.getY()+radius*3*2 && (center.getY() + y) >= entLoc.getY()-radius*3/2);
 							boolean closeZ = (center.getZ() <= entLoc.getZ()+radius*3 && center.getZ() >= entLoc.getZ()-radius*3);
 							if(closeX && closeY && closeZ){
-								((Damageable)ent).damage(4);
+								((Damageable)ent).damage(damage);
 								this.cancel();
 							}
 						}
 					}
 					
 			        time[0] += 0.1;
-			        if(time[0] >= range)
+			        if(Math.sqrt(Math.pow(center.getX(), 2) + Math.pow(center.getY(), 2) + Math.pow(center.getZ(), 2)) >= range)
 			        	this.cancel();
 		    	}
 	    	}

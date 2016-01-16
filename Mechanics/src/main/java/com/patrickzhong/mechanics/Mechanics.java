@@ -42,7 +42,7 @@ public class Mechanics extends JavaPlugin implements Listener{
 	Plugin plugin;
 	BukkitTask timer;
 	BukkitTask healCoolTimer;
-	private KingdomLifeAPI kLifeAPI;
+	//private KingdomLifeAPI kLifeAPI;
 	
 	public void onEnable(){
 		this.getServer().getPluginManager().registerEvents(this, this);
@@ -55,7 +55,7 @@ public class Mechanics extends JavaPlugin implements Listener{
 			}
 		}.runTaskTimer(this, 100, 100);
 		
-		new BukkitRunnable(){
+		/*new BukkitRunnable(){
 			public void run(){
 				if (!setUpKingdomLifeAPI() ) {
 		            getLogger().severe(String.format("[%s] - Disabled due to no KingdomLifeAPI found!", getDescription().getName()));
@@ -66,6 +66,7 @@ public class Mechanics extends JavaPlugin implements Listener{
 			}
 		}.runTaskLater(plugin, 1);
 		
+		
 		new BukkitRunnable(){
 			public void run(){
 				if(!getServer().getPluginManager().isPluginEnabled("KingdomLifeAPI")){
@@ -75,23 +76,24 @@ public class Mechanics extends JavaPlugin implements Listener{
 				}
 			}
 		}.runTaskTimer(plugin, 0, 1);
+		*/
 	}
-	
+	/*
 	private boolean setUpKingdomLifeAPI(){
 		if (getServer().getPluginManager().getPlugin("KingdomLifeAPI") == null) {
             return false;
         }
-		/*RegisteredServiceProvider<KingdomLifeAPI> rsp = getServer().getServicesManager().getRegistration(KingdomLifeAPI.class);
+		RegisteredServiceProvider<KingdomLifeAPI> rsp = getServer().getServicesManager().getRegistration(KingdomLifeAPI.class);
         if (rsp == null) {
             return false;
         }
         kLifeAPI = rsp.getProvider();
         return kLifeAPI != null;
-        */
-		
+        
 		kLifeAPI = (KingdomLifeAPI)getServer().getPluginManager().getPlugin("KingdomLifeAPI");
 		return kLifeAPI != null;
     }
+    */
 	
 	@EventHandler
 	public void onProjectileHit(ProjectileHitEvent ev){
@@ -130,7 +132,7 @@ public class Mechanics extends JavaPlugin implements Listener{
 	@EventHandler
 	public void onInvClose(InventoryCloseEvent ev){
 		Inventory inv = ev.getInventory();
-		if(inv.getTitle().equalsIgnoreCase("Character Selection") && kLifeAPI.type(ev.getPlayer().getUniqueId().toString()).equals(""))
+		if(inv.getTitle().equalsIgnoreCase("Character Selection") && KingdomLifeAPI.type(ev.getPlayer().getUniqueId().toString()).equals(""))
 			ev.getPlayer().openInventory(inv);
 	}
 	
@@ -156,7 +158,7 @@ public class Mechanics extends JavaPlugin implements Listener{
 					
 			}else if(loreLine.contains("Min. Level")){
 				int minLevel = Integer.parseInt(loreLine.substring(loreLine.indexOf(":")+2));
-				if(kLifeAPI.level(player.getUniqueId().toString(), kLifeAPI.type(player.getUniqueId().toString())) >= minLevel){
+				if(KingdomLifeAPI.level(player.getUniqueId().toString(), KingdomLifeAPI.type(player.getUniqueId().toString())) >= minLevel){
 					ev.setCancelled(true);
 					EnumParticle[] particles = {EnumParticle.CLOUD, EnumParticle.CRIT_MAGIC, EnumParticle.SPELL_WITCH, EnumParticle.VILLAGER_HAPPY};
 					createHelix(player, particles[(int)Math.floor(Math.random()*particles.length)], attack);

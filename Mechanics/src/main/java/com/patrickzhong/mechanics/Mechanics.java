@@ -65,6 +65,16 @@ public class Mechanics extends JavaPlugin implements Listener{
 				getLogger().info("Mechanics enabled successfully.");
 			}
 		}.runTaskLater(plugin, 1);
+		
+		new BukkitRunnable(){
+			public void run(){
+				if(!getServer().getPluginManager().isPluginEnabled("KingdomLifeAPI")){
+					kLifeAPI = null;
+				}else if(kLifeAPI == null){
+					kLifeAPI = (KingdomLifeAPI)getServer().getPluginManager().getPlugin("KingdomLifeAPI");
+				}
+			}
+		}.runTaskTimer(plugin, 0, 1);
 	}
 	
 	private boolean setUpKingdomLifeAPI(){

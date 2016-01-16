@@ -71,7 +71,7 @@ public class Mechanics extends JavaPlugin implements Listener{
 		if (getServer().getPluginManager().getPlugin("KingdomLifeAPI") == null) {
             return false;
         }
-        /*RegisteredServiceProvider<KingdomLifeAPI> rsp = getServer().getServicesManager().getRegistration(KingdomLifeAPI.class);
+		/*RegisteredServiceProvider<KingdomLifeAPI> rsp = getServer().getServicesManager().getRegistration(KingdomLifeAPI.class);
         if (rsp == null) {
             return false;
         }
@@ -79,7 +79,7 @@ public class Mechanics extends JavaPlugin implements Listener{
         return kLifeAPI != null;
         */
 		
-		kLifeAPI = KingdomLifeAPI.getPlugin(KingdomLifeAPI.class);
+		kLifeAPI = (KingdomLifeAPI)getServer().getPluginManager().getPlugin("KingdomLifeAPI");
 		return kLifeAPI != null;
     }
 	
@@ -178,8 +178,6 @@ public class Mechanics extends JavaPlugin implements Listener{
 					float newY = (float)(y+maxRadius-time[0]);
 					float newZ = (float)(zLoc(i, radius) + z);
 					
-					if(radius == 0)
-						getLogger().info(newX+","+newY+","+newZ+",");
 					PacketPlayOutWorldParticles packet= new PacketPlayOutWorldParticles(EnumParticle.CRIT_MAGIC, true, newX, newY, newZ, 0f, 0f, 0f, 0f, 1);
 					for(Player player : Bukkit.getServer().getOnlinePlayers()){
 						((CraftPlayer)player).getHandle().playerConnection.sendPacket(packet);

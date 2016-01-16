@@ -71,13 +71,17 @@ public class Mechanics extends JavaPlugin implements Listener{
 		if (getServer().getPluginManager().getPlugin("KingdomLifeAPI") == null) {
             return false;
         }
-        RegisteredServiceProvider<KingdomLifeAPI> rsp = getServer().getServicesManager().getRegistration(KingdomLifeAPI.class);
+        /*RegisteredServiceProvider<KingdomLifeAPI> rsp = getServer().getServicesManager().getRegistration(KingdomLifeAPI.class);
         if (rsp == null) {
             return false;
         }
         kLifeAPI = rsp.getProvider();
         return kLifeAPI != null;
-	}
+        */
+		
+		kLifeAPI = KingdomLifeAPI.getPlugin(KingdomLifeAPI.class);
+		return kLifeAPI != null;
+    }
 	
 	@EventHandler
 	public void onProjectileHit(ProjectileHitEvent ev){

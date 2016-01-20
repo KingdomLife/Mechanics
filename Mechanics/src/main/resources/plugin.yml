@@ -1,3 +1,8 @@
 name: Mechanics
 main: com.patrickzhong.mechanics.Mechanics
 version: 1
+
+commands:
+  johnCena:
+    description: Plays My Time is Now by John Cena.
+    usage: /<command>

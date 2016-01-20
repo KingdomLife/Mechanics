@@ -8,6 +8,9 @@ import org.bukkit.Color;
 import org.bukkit.Effect;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.Sound;
+import org.bukkit.command.Command;
+import org.bukkit.command.CommandSender;
 import org.bukkit.craftbukkit.v1_8_R3.entity.CraftPlayer;
 import org.bukkit.entity.Arrow;
 import org.bukkit.entity.Damageable;
@@ -37,12 +40,13 @@ import com.patrickzhong.kingdomlifeapi.KingdomLifeAPI;
 
 import net.minecraft.server.v1_8_R3.EnumParticle;
 import net.minecraft.server.v1_8_R3.PacketPlayOutWorldParticles;
+import net.minecraft.server.v1_8_R3.PacketPlayOutNamedSoundEffect;
 
 public class Mechanics extends JavaPlugin implements Listener{
 	Plugin plugin;
 	BukkitTask timer;
 	BukkitTask healCoolTimer;
-	//private KingdomLifeAPI kLifeAPI;
+	private KingdomLifeAPI kLifeAPI;
 	
 	public void onEnable(){
 		this.getServer().getPluginManager().registerEvents(this, this);
@@ -55,18 +59,14 @@ public class Mechanics extends JavaPlugin implements Listener{
 			}
 		}.runTaskTimer(this, 100, 100);
 		
-		/*new BukkitRunnable(){
+		new BukkitRunnable(){
 			public void run(){
-				if (!setUpKingdomLifeAPI() ) {
-		            getLogger().severe(String.format("[%s] - Disabled due to no KingdomLifeAPI found!", getDescription().getName()));
-		            getServer().getPluginManager().disablePlugin(plugin);
-		            return;
-		        }
+				kLifeAPI = (KingdomLifeAPI)getServer().getPluginManager().getPlugin("KingdomLifeAPI");
 				getLogger().info("Mechanics enabled successfully.");
 			}
 		}.runTaskLater(plugin, 1);
 		
-		
+		/*
 		new BukkitRunnable(){
 			public void run(){
 				if(!getServer().getPluginManager().isPluginEnabled("KingdomLifeAPI")){
@@ -94,6 +94,17 @@ public class Mechanics extends JavaPlugin implements Listener{
 		return kLifeAPI != null;
     }
     */
+	
+	public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args){
+		if(cmd.getName().equalsIgnoreCase("johnCena")){
+			Player player = (Player)sender;
+			Location loc = player.getLocation();
+			PacketPlayOutNamedSoundEffect packet= new PacketPlayOutNamedSoundEffect("random.bow", loc.getX(), loc.getY(), loc.getZ(), 1, 1);
+			((CraftPlayer)player).getHandle().playerConnection.sendPacket(packet);
+			return true;
+		}
+		return false;
+	}
 	
 	@EventHandler
 	public void onProjectileHit(ProjectileHitEvent ev){
@@ -132,7 +143,7 @@ public class Mechanics extends JavaPlugin implements Listener{
 	@EventHandler
 	public void onInvClose(InventoryCloseEvent ev){
 		Inventory inv = ev.getInventory();
-		if(inv.getTitle().equalsIgnoreCase("Character Selection") && KingdomLifeAPI.type(ev.getPlayer().getUniqueId().toString()).equals(""))
+		if(inv.getTitle().equalsIgnoreCase("Character Selection") && kLifeAPI.type(ev.getPlayer().getUniqueId().toString()).equals(""))
 			ev.getPlayer().openInventory(inv);
 	}
 	
@@ -158,15 +169,16 @@ public class Mechanics extends JavaPlugin implements Listener{
 					
 			}else if(loreLine.contains("Min. Level")){
 				int minLevel = Integer.parseInt(loreLine.substring(loreLine.indexOf(":")+2));
-				if(KingdomLifeAPI.level(player.getUniqueId().toString(), KingdomLifeAPI.type(player.getUniqueId().toString())) >= minLevel){
+				if(kLifeAPI.level(player.getUniqueId().toString(), kLifeAPI.type(player.getUniqueId().toString())) >= minLevel){
 					ev.setCancelled(true);
 					EnumParticle[] particles = {EnumParticle.CLOUD, EnumParticle.CRIT_MAGIC, EnumParticle.SPELL_WITCH, EnumParticle.VILLAGER_HAPPY};
 					createHelix(player, particles[(int)Math.floor(Math.random()*particles.length)], attack);
 					return;
-				}else {
-					player.sendMessage(ChatColor.RED+"You must be of level "+minLevel+" to use this weapon!");
-					return;
 				}
+				//else {
+				//	player.sendMessage(ChatColor.RED+"You must be of level "+minLevel+" to use this weapon!");
+				//	return;
+				//}
 			}
 		}
 	
@@ -241,8 +253,8 @@ public class Mechanics extends JavaPlugin implements Listener{
 	
 	
 	private void createHelix(final Player player, final EnumParticle particle, final int damage) {
-		final Location loc = player.getLocation();
-		loc.add(0, 0.5, 0);
+		final Location loc = player.getEyeLocation();
+		//loc.add(0, 0.7, 0);
 		final Vector direction = player.getLocation().getDirection();
 	    final double radius = 0.25;
 	    final int range = 7;
@@ -276,7 +288,7 @@ public class Mechanics extends JavaPlugin implements Listener{
 					}
 					
 			        time[0] += 0.1;
-			        if(Math.sqrt(Math.pow(center.getX(), 2) + Math.pow(center.getY(), 2) + Math.pow(center.getZ(), 2)) >= range)
+			        if(Math.sqrt(Math.pow(direction.getX() * time[0], 2) + Math.pow(direction.getY() * time[0], 2) + Math.pow(direction.getZ() * time[0], 2)) >= range)
 			        	this.cancel();
 		    	}
 	    	}

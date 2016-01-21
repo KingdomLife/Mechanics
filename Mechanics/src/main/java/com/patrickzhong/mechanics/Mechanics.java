@@ -143,7 +143,7 @@ public class Mechanics extends JavaPlugin implements Listener{
 	@EventHandler
 	public void onInvClose(InventoryCloseEvent ev){
 		Inventory inv = ev.getInventory();
-		if(inv.getTitle().equalsIgnoreCase("Character Selection") && kLifeAPI.type(ev.getPlayer().getUniqueId().toString()).equals(""))
+		if(inv.getTitle().equalsIgnoreCase("Character Selection") && kLifeAPI.type(ev.getPlayer().getUniqueId().toString()).equals("null"))
 			ev.getPlayer().openInventory(inv);
 	}
 	
@@ -151,7 +151,8 @@ public class Mechanics extends JavaPlugin implements Listener{
 	public void onStickClick(PlayerInteractEvent ev){
 		final Player player = ev.getPlayer();
 		ItemStack hand = player.getInventory().getItemInHand();
-		if(hand == null || !hand.getType().equals(Material.STICK) || !hand.hasItemMeta() || !hand.getItemMeta().hasLore())
+		String type = kLifeAPI.type(player.getUniqueId().toString());
+		if(hand == null || !type.split("-")[1].equals("mage") || !hand.getType().equals(Material.STICK) || !hand.hasItemMeta() || !hand.getItemMeta().hasLore())
 			return;
 		List<String> lores = hand.getItemMeta().getLore();
 		int attack = 0;
@@ -169,7 +170,7 @@ public class Mechanics extends JavaPlugin implements Listener{
 					
 			}else if(loreLine.contains("Min. Level")){
 				int minLevel = Integer.parseInt(loreLine.substring(loreLine.indexOf(":")+2));
-				if(kLifeAPI.level(player.getUniqueId().toString(), kLifeAPI.type(player.getUniqueId().toString())) >= minLevel){
+				if(kLifeAPI.level(player.getUniqueId().toString(), type) >= minLevel){
 					ev.setCancelled(true);
 					EnumParticle[] particles = {EnumParticle.CLOUD, EnumParticle.CRIT_MAGIC, EnumParticle.SPELL_WITCH, EnumParticle.VILLAGER_HAPPY};
 					createHelix(player, particles[(int)Math.floor(Math.random()*particles.length)], attack);
@@ -187,6 +188,11 @@ public class Mechanics extends JavaPlugin implements Listener{
 	@EventHandler
 	public void onTeleport(PlayerTeleportEvent ev){
 		final Location loc = ev.getTo();
+		final Location from = ev.getFrom();
+		
+		if(loc.distance(from) < 1)
+			return;
+		
 		final double x = loc.getX();
 		final double y = loc.getY();
 		final double z = loc.getZ();

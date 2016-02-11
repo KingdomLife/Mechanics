@@ -19,7 +19,9 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
+import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.event.entity.EntityDamageEvent.DamageCause;
 import org.bukkit.event.entity.EntityRegainHealthEvent;
 import org.bukkit.event.entity.ProjectileHitEvent;
 import org.bukkit.event.entity.EntityRegainHealthEvent.RegainReason;
@@ -118,6 +120,16 @@ public class Mechanics extends JavaPlugin implements Listener{
 		if(ev.getEntity() instanceof Player && ev.getRegainReason().equals(RegainReason.SATIATED))
 			ev.setCancelled(true);
 	}
+	/*
+	@EventHandler
+	public void onInteract(PlayerInteractEvent ev){
+		if(ev.getAction() == Action.RIGHT_CLICK_AIR || ev.getAction() == Action.RIGHT_CLICK_BLOCK){
+			if(ev.getItem() != null && ev.getItem().getType() == Material.POTION){
+				ev.setCancelled(true);
+				
+			}
+		}
+	}*/
 	
 	@EventHandler
 	public void onPlayerHurt(EntityDamageEvent ev){
@@ -141,48 +153,63 @@ public class Mechanics extends JavaPlugin implements Listener{
 	}
 	
 	@EventHandler
-	public void onInvClose(InventoryCloseEvent ev){
-		Inventory inv = ev.getInventory();
-		if(inv.getTitle().equalsIgnoreCase("Character Selection") && kLifeAPI.type(ev.getPlayer().getUniqueId().toString()).equals("null"))
-			ev.getPlayer().openInventory(inv);
+	public void onInvClose(final InventoryCloseEvent ev){
+		final Inventory inv = ev.getInventory();
+		String type = kLifeAPI.type(ev.getPlayer().getUniqueId().toString());
+		if(inv.getTitle().equalsIgnoreCase("Character Selection") && type.equals("null")){
+			new BukkitRunnable(){
+				public void run(){
+					ev.getPlayer().openInventory(inv);
+				}
+			}.runTaskLater(plugin, 1);
+		}
+		else if(inv.getTitle().equalsIgnoreCase("Select a Class") && type.equals("selclass")){
+			new BukkitRunnable(){
+				public void run(){
+					Bukkit.getServer().dispatchCommand(Bukkit.getConsoleSender(), "chr " + ev.getPlayer().getName() + " null");
+					//ev.getPlayer().openInventory(inv);
+				}
+			}.runTaskLater(plugin, 1);
+		}
 	}
 	
 	@EventHandler
 	public void onStickClick(PlayerInteractEvent ev){
-		final Player player = ev.getPlayer();
-		ItemStack hand = player.getInventory().getItemInHand();
-		String type = kLifeAPI.type(player.getUniqueId().toString());
-		if(hand == null || !type.split("-")[1].equals("mage") || !hand.getType().equals(Material.STICK) || !hand.hasItemMeta() || !hand.getItemMeta().hasLore())
-			return;
-		List<String> lores = hand.getItemMeta().getLore();
-		int attack = 0;
-		for(int a = 0; a < lores.size(); a++){
-			String loreLine = ChatColor.stripColor(lores.get(a));
-			if(loreLine.contains("Attack")){
-				String attStr = loreLine.substring(loreLine.indexOf(":")+2);
-				if(!attStr.contains("-"))
-					attack = Integer.parseInt(attStr);
-				else {
-					int first = Integer.parseInt(attStr.split("-")[0]);
-					int last = Integer.parseInt(attStr.split("-")[1]);
-					attack = (int)Math.floor(Math.random()*(last-first+1)+first);
+		if(ev.getAction() != Action.RIGHT_CLICK_AIR && ev.getAction() != Action.RIGHT_CLICK_BLOCK){
+			final Player player = ev.getPlayer();
+			ItemStack hand = player.getInventory().getItemInHand();
+			String type = kLifeAPI.type(player.getUniqueId().toString());
+			if(hand == null || !type.split("-")[1].equals("mage") || !hand.getType().equals(Material.STICK) || !hand.hasItemMeta() || !hand.getItemMeta().hasLore())
+				return;
+			List<String> lores = hand.getItemMeta().getLore();
+			int attack = 0;
+			for(int a = 0; a < lores.size(); a++){
+				String loreLine = ChatColor.stripColor(lores.get(a));
+				if(loreLine.contains("Attack")){
+					String attStr = loreLine.substring(loreLine.indexOf(":")+2);
+					if(!attStr.contains("-"))
+						attack = Integer.parseInt(attStr);
+					else {
+						int first = Integer.parseInt(attStr.split("-")[0]);
+						int last = Integer.parseInt(attStr.split("-")[1]);
+						attack = (int)Math.floor(Math.random()*(last-first+1)+first);
+					}
+						
+				}else if(loreLine.contains("Min. Level")){
+					int minLevel = Integer.parseInt(loreLine.substring(loreLine.indexOf(":")+2));
+					if(kLifeAPI.level(player.getUniqueId().toString(), type) >= minLevel){
+						ev.setCancelled(true);
+						EnumParticle[] particles = {EnumParticle.CLOUD, EnumParticle.CRIT_MAGIC, EnumParticle.SPELL_WITCH, EnumParticle.VILLAGER_HAPPY};
+						createHelix(player, particles[(int)Math.floor(Math.random()*particles.length)], attack);
+						return;
+					}
+					//else {
+					//	player.sendMessage(ChatColor.RED+"You must be of level "+minLevel+" to use this weapon!");
+					//	return;
+					//}
 				}
-					
-			}else if(loreLine.contains("Min. Level")){
-				int minLevel = Integer.parseInt(loreLine.substring(loreLine.indexOf(":")+2));
-				if(kLifeAPI.level(player.getUniqueId().toString(), type) >= minLevel){
-					ev.setCancelled(true);
-					EnumParticle[] particles = {EnumParticle.CLOUD, EnumParticle.CRIT_MAGIC, EnumParticle.SPELL_WITCH, EnumParticle.VILLAGER_HAPPY};
-					createHelix(player, particles[(int)Math.floor(Math.random()*particles.length)], attack);
-					return;
-				}
-				//else {
-				//	player.sendMessage(ChatColor.RED+"You must be of level "+minLevel+" to use this weapon!");
-				//	return;
-				//}
 			}
 		}
-	
 	}
 	
 	@EventHandler
@@ -209,7 +236,7 @@ public class Mechanics extends JavaPlugin implements Listener{
 					float newZ = (float)(zLoc(i, radius) + z);
 					
 					PacketPlayOutWorldParticles packet= new PacketPlayOutWorldParticles(EnumParticle.CRIT_MAGIC, true, newX, newY, newZ, 0f, 0f, 0f, 0f, 1);
-					for(Player player : Bukkit.getServer().getOnlinePlayers()){
+					for(Player player : loc.getWorld().getPlayers()){
 						((CraftPlayer)player).getHandle().playerConnection.sendPacket(packet);
 					}
 				}
@@ -234,7 +261,7 @@ public class Mechanics extends JavaPlugin implements Listener{
 	}
 	
 	private void heal(){
-		Player[] playerList = Bukkit.getServer().getOnlinePlayers();
+		List<Player> playerList = (List<Player>)Bukkit.getServer().getOnlinePlayers();
 		for(Player player: playerList){
 			if(!player.hasMetadata("healCool") || player.getMetadata("healCool").size() == 0 || player.getMetadata("healCool").get(0).asBoolean()){
 				if(player.getHealth() >= 0.9*player.getMaxHealth())
@@ -262,7 +289,7 @@ public class Mechanics extends JavaPlugin implements Listener{
 		final Location loc = player.getEyeLocation();
 		//loc.add(0, 0.7, 0);
 		final Vector direction = player.getLocation().getDirection();
-	    final double radius = 0.25;
+	    final double radius = 0.35;
 	    final int range = 7;
 	    final Double[] time = {0.0};
 	    new BukkitRunnable(){
@@ -271,9 +298,9 @@ public class Mechanics extends JavaPlugin implements Listener{
 		    		Location center = new Location(loc.getWorld(), loc.getX() + direction.getX() * time[0], loc.getY() + direction.getY() * time[0], loc.getZ() + direction.getZ() * time[0]);
 		    		double x = radius * Math.sin(time[0]) * Math.cos(Math.PI/180 * loc.getYaw());
 		    		double y = radius * Math.cos(time[0]);
-			        //double z = time[0];
-			        PacketPlayOutWorldParticles packet = new PacketPlayOutWorldParticles(particle, true, (float) (center.getX() + x), (float) (center.getY() + y), (float) (center.getZ()), 0f, 0f, 0f, 0f, 1);
-			        for(Player online : Bukkit.getOnlinePlayers()) {
+			        double z = radius * Math.sin(time[0]) * Math.sin(Math.PI/180 * loc.getYaw());
+			        PacketPlayOutWorldParticles packet = new PacketPlayOutWorldParticles(particle, true, (float) (center.getX() + x), (float) (center.getY() + y), (float) (center.getZ() + z), 0f, 0f, 0f, 0f, 1);
+			        for(Player online : loc.getWorld().getPlayers()) {
 			            ((CraftPlayer)online).getHandle().playerConnection.sendPacket(packet);
 			        }
 			        
@@ -285,9 +312,12 @@ public class Mechanics extends JavaPlugin implements Listener{
 							Location entLoc = ent.getLocation();
 							boolean closeX = ((center.getX() + x) <= entLoc.getX()+radius*3 && (center.getX() + x) >= entLoc.getX()-radius*3);
 							boolean closeY = ((center.getY() + y) <= entLoc.getY()+radius*3*2 && (center.getY() + y) >= entLoc.getY()-radius*3/2);
-							boolean closeZ = (center.getZ() <= entLoc.getZ()+radius*3 && center.getZ() >= entLoc.getZ()-radius*3);
+							boolean closeZ = ((center.getZ() + z) <= entLoc.getZ()+radius*3 && (center.getZ() + z) >= entLoc.getZ()-radius*3);
 							if(closeX && closeY && closeZ){
-								((Damageable)ent).damage(damage);
+								EntityDamageByEntityEvent damEv = new EntityDamageByEntityEvent(player, ent, DamageCause.MAGIC, damage);
+								Bukkit.getServer().getPluginManager().callEvent(damEv);
+								if(!damEv.isCancelled())
+									((Damageable)ent).damage(damage);
 								this.cancel();
 							}
 						}

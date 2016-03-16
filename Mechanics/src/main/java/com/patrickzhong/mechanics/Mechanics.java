@@ -1,5 +1,7 @@
 package com.patrickzhong.mechanics;
 
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 
 import org.bukkit.Bukkit;
@@ -12,24 +14,33 @@ import org.bukkit.Sound;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.craftbukkit.v1_8_R3.entity.CraftPlayer;
+import org.bukkit.craftbukkit.v1_8_R3.inventory.CraftItemStack;
 import org.bukkit.entity.Arrow;
 import org.bukkit.entity.Damageable;
 import org.bukkit.entity.Entity;
+import org.bukkit.entity.IronGolem;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityDamageEvent.DamageCause;
 import org.bukkit.event.entity.EntityRegainHealthEvent;
+import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.entity.ProjectileHitEvent;
 import org.bukkit.event.entity.EntityRegainHealthEvent.RegainReason;
+import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
+import org.bukkit.event.inventory.InventoryType;
+import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.metadata.FixedMetadataValue;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.RegisteredServiceProvider;
@@ -40,26 +51,33 @@ import org.bukkit.util.Vector;
 
 import com.patrickzhong.kingdomlifeapi.KingdomLifeAPI;
 
+import net.minecraft.server.v1_8_R3.ChatComponentText;
+import net.minecraft.server.v1_8_R3.ChatHoverable;
+import net.minecraft.server.v1_8_R3.ChatMessage;
 import net.minecraft.server.v1_8_R3.EnumParticle;
+import net.minecraft.server.v1_8_R3.IChatBaseComponent;
+import net.minecraft.server.v1_8_R3.NBTTagCompound;
+import net.minecraft.server.v1_8_R3.NBTTagList;
+import net.minecraft.server.v1_8_R3.PacketPlayOutChat;
 import net.minecraft.server.v1_8_R3.PacketPlayOutWorldParticles;
 import net.minecraft.server.v1_8_R3.PacketPlayOutNamedSoundEffect;
+import net.minecraft.server.v1_8_R3.IChatBaseComponent.ChatSerializer;
 
 public class Mechanics extends JavaPlugin implements Listener{
 	Plugin plugin;
 	BukkitTask timer;
 	BukkitTask healCoolTimer;
-	private KingdomLifeAPI kLifeAPI;
+	KingdomLifeAPI kLifeAPI;
+	List<Player> locked = new ArrayList<Player>();
+	Spells spells;
+	ChatBot jimmy;
 	
 	public void onEnable(){
 		this.getServer().getPluginManager().registerEvents(this, this);
 		
 		plugin = this;
-		
-		new BukkitRunnable(){
-			public void run(){
-				heal();
-			}
-		}.runTaskTimer(this, 100, 100);
+		spells = new Spells(this);
+		jimmy = new ChatBot("Helpful", this);
 		
 		new BukkitRunnable(){
 			public void run(){
@@ -67,35 +85,7 @@ public class Mechanics extends JavaPlugin implements Listener{
 				getLogger().info("Mechanics enabled successfully.");
 			}
 		}.runTaskLater(plugin, 1);
-		
-		/*
-		new BukkitRunnable(){
-			public void run(){
-				if(!getServer().getPluginManager().isPluginEnabled("KingdomLifeAPI")){
-					kLifeAPI = null;
-				}else if(kLifeAPI == null){
-					kLifeAPI = (KingdomLifeAPI)getServer().getPluginManager().getPlugin("KingdomLifeAPI");
-				}
-			}
-		}.runTaskTimer(plugin, 0, 1);
-		*/
 	}
-	/*
-	private boolean setUpKingdomLifeAPI(){
-		if (getServer().getPluginManager().getPlugin("KingdomLifeAPI") == null) {
-            return false;
-        }
-		RegisteredServiceProvider<KingdomLifeAPI> rsp = getServer().getServicesManager().getRegistration(KingdomLifeAPI.class);
-        if (rsp == null) {
-            return false;
-        }
-        kLifeAPI = rsp.getProvider();
-        return kLifeAPI != null;
-        
-		kLifeAPI = (KingdomLifeAPI)getServer().getPluginManager().getPlugin("KingdomLifeAPI");
-		return kLifeAPI != null;
-    }
-    */
 	
 	public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args){
 		if(cmd.getName().equalsIgnoreCase("johnCena")){
@@ -105,8 +95,293 @@ public class Mechanics extends JavaPlugin implements Listener{
 			((CraftPlayer)player).getHandle().playerConnection.sendPacket(packet);
 			return true;
 		}
+		else if(cmd.getName().equalsIgnoreCase("class")){
+			Player player = (Player)sender;
+			
+			openClassSelection(player);
+			
+			return true;
+		}
+		else if(cmd.getName().equalsIgnoreCase("lightshow")){
+			if(args.length < 2)
+				return false;
+			
+			final Player player = (Player)sender;
+			final Location loc = player.getTargetBlock((HashSet<Byte>)null, 100).getLocation().add(0, 3, 0);
+			
+			final double[] time = {Double.parseDouble(args[1])};
+			final double radius = Double.parseDouble(args[0]);
+			final String[] names = {"Helix", "Narrowing Corkscrew", "Bouncing Arc", "Lemniscate", "Double Helix", "Wild Banshee", "Mist", "Mist", "Machination", "Machination", "Machination"};
+			
+			new BukkitRunnable(){
+				public void run(){
+					
+					Location spawn = new Location(loc.getWorld(), loc.getX() + Math.random()*radius*2-radius, loc.getY(), loc.getZ() + Math.random()*radius*2-radius);
+					Vector direction = new Vector(0,1,0);
+					
+					direction.setX(Math.random()/4.0-1.0/8.0 + direction.getX());
+					direction.setY(Math.random()/4.0-1.0/8.0 + direction.getY());
+					direction.setZ(Math.random()/4.0-1.0/8.0 + direction.getZ());
+					//names[(int)(Math.random()*names.length)]
+					spells.launchSpell(player, "Machination", spawn, direction);
+					
+					time[0] -= 0.1;
+					
+					if(time[0] <= 0)
+						this.cancel();
+				}
+			}.runTaskTimer(this, 0, 2);
+			
+			return true;
+		}
 		return false;
 	}
+	
+	private double round(double query){
+		return Math.round(query*10.0)/10.0;
+	}
+	
+	private ItemStack removeAttributes(ItemStack i){
+        if(i == null) {
+            return i;
+        }
+        if(i.getType() == Material.BOOK_AND_QUILL) {
+            return i;
+        }
+        ItemStack item = i.clone();
+        net.minecraft.server.v1_8_R3.ItemStack nmsStack = CraftItemStack.asNMSCopy(item);
+        NBTTagCompound tag;
+        if (!nmsStack.hasTag()){
+            tag = new NBTTagCompound();
+            nmsStack.setTag(tag);
+        }
+        else {
+            tag = nmsStack.getTag();
+        }
+        NBTTagList am = new NBTTagList();
+        tag.set("AttributeModifiers", am);
+        nmsStack.setTag(tag);
+        return CraftItemStack.asCraftMirror(nmsStack);
+    }
+	
+	/*
+	 * 
+	 * 
+	 * ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * CLASS SELECTION ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * 
+	 * 
+	 */
+	
+	private void openClassSelection(Player player){
+		Inventory inv = Bukkit.createInventory(player, 36, "Character Selection");
+		
+		ItemStack create = new ItemStack(Material.STAINED_CLAY, 1, (byte)14);
+		ItemMeta im = create.getItemMeta();
+		im.setDisplayName(ChatColor.RED+"Create Character");
+		List<String> lore = new ArrayList<String>();
+		lore.add(ChatColor.GRAY+"Click to create a new character!");
+		im.setLore(lore);
+		create.setItemMeta(im);
+		
+		String uuid = player.getUniqueId().toString();
+		List<Object[]> classes = kLifeAPI.classInfo(uuid);
+		
+		int i = 0;
+		for(i = 0; i < classes.size(); i++){
+			Object[] info = classes.get(i);
+			int row = i/5;
+			int col = i - row*5;
+			
+			String className = (String)info[0];
+			ItemStack c = create;
+			
+			if(className.contains("Mage"))
+				c = new ItemStack(Material.STICK);
+			else if(className.contains("Archer"))
+				c = new ItemStack(Material.BOW);
+			else if(className.contains("Rogue"))
+				c = new ItemStack(Material.LEVER);
+			else if(className.contains("Warrior"))
+				c = new ItemStack(Material.WOOD_AXE);
+			else if(className.contains("none")){
+				inv.setItem(11+(row*9)+col, removeAttributes(c));
+				break;
+			}
+				
+			ItemMeta m = c.getItemMeta();
+			m.setDisplayName(ChatColor.YELLOW+"Character "+(i+1)+" ("+className+")");
+			List<String> l = new ArrayList<String>();
+			l.add(ChatColor.YELLOW+"- "+ChatColor.GRAY+"Level: "+ChatColor.AQUA+kLifeAPI.level(uuid, className.toLowerCase()));
+			l.add(ChatColor.YELLOW+"- "+ChatColor.GRAY+"Health: "+ChatColor.AQUA+((Double)info[1]).intValue()+"/"+((Double)info[2]).intValue());
+			l.add(ChatColor.YELLOW+"- "+ChatColor.GRAY+"Mana: "+ChatColor.AQUA+((Double)info[3]).intValue()+"/20");
+			l.add(ChatColor.YELLOW+"- "+ChatColor.GRAY+"Quest Progress: "+ChatColor.AQUA+"0%");
+			m.setLore(l);
+			c.setItemMeta(m);
+			
+			inv.setItem(11+(row*9)+col, removeAttributes(c));
+		}
+		
+		i++;
+		int row = i/5;
+		int col = i - row*5;
+		
+		for(i = 11+(row*9)+col; i < 25; i++){
+			inv.setItem(i, removeAttributes(create));
+		}
+		
+		locked.add(player);
+		player.openInventory(inv);
+	}
+	
+	@EventHandler
+	public void onInventoryClick(InventoryClickEvent ev){
+		Inventory inv = ev.getInventory();
+		
+		if(inv.getTitle().contains("Character Selection") || inv.getTitle().contains("Select a Class")){
+			ItemStack clicked = ev.getCurrentItem();
+			Player player = (Player)ev.getWhoClicked();
+			
+			if(clicked != null){
+				ev.setCancelled(true);
+				String disp = ChatColor.stripColor(clicked.getItemMeta().getDisplayName());
+				
+				locked.remove(player);
+				
+				if(disp.contains("(")){
+					String type = disp.substring(disp.indexOf("(")+1, disp.indexOf(")"));
+					Bukkit.getServer().dispatchCommand(Bukkit.getConsoleSender(), "chr " + player.getName() + " select " + type);
+					player.closeInventory();
+				}
+				else if(disp.contains("Class")){
+					String type = disp.substring(0, disp.indexOf(" Class")).toLowerCase();
+					Bukkit.getServer().dispatchCommand(Bukkit.getConsoleSender(), "chr " + ev.getWhoClicked().getName() + " create " + type);
+					ev.getWhoClicked().closeInventory();
+				}
+				else if(disp.contains("Character")){
+					player.closeInventory();
+					createCharacter((Player)ev.getWhoClicked());
+				}
+			}
+		}
+	}
+	
+	private void createCharacter(Player player){
+		locked.add(player);
+		
+		Inventory inv = Bukkit.createInventory(player, 36, "Select a Class");
+		
+		ItemStack mage = new ItemStack(Material.STICK);
+		ItemStack archer = new ItemStack(Material.BOW);
+		ItemStack rogue = new ItemStack(Material.LEVER);
+		ItemStack warrior = new ItemStack(Material.WOOD_AXE);
+		
+		String A = ChatColor.RED+"\u25A0";
+		String D = ChatColor.GREEN+"\u25A0";
+		String R = ChatColor.AQUA+"\u25A0";
+		String E = ChatColor.GRAY+"\u25A0";
+		
+		ItemMeta m = mage.getItemMeta();
+		m.setDisplayName(ChatColor.YELLOW+""+ChatColor.BOLD+"Mage Class");
+		List<String> lore = new ArrayList<String>();
+		lore.add(ChatColor.GRAY+"Attack:  "+A+A+A+A+E+E+E+E+E+E);
+		lore.add(ChatColor.GRAY+"Defence: "+D+D+D+D+D+D+E+E+E+E);
+		lore.add(ChatColor.GRAY+"Range:   "+R+R+R+R+R+R+E+E+E+E);
+		lore.add("");
+		lore.add(ChatColor.GRAY+""+ChatColor.ITALIC+"Click to select this class");
+		m.setLore(lore);
+		mage.setItemMeta(m);
+		
+		ItemMeta a = archer.getItemMeta();
+		a.setDisplayName(ChatColor.YELLOW+""+ChatColor.BOLD+"Archer Class");
+		lore = new ArrayList<String>();
+		lore.add(ChatColor.GRAY+"Attack:  "+A+A+A+A+A+A+E+E+E+E);
+		lore.add(ChatColor.GRAY+"Defence: "+D+D+D+D+E+E+E+E+E+E);
+		lore.add(ChatColor.GRAY+"Range:   "+R+R+R+R+R+R+R+R+R+R);
+		lore.add("");
+		lore.add(ChatColor.GRAY+""+ChatColor.ITALIC+"Click to select this class");
+		a.setLore(lore);
+		archer.setItemMeta(a);
+		
+		ItemMeta r = rogue.getItemMeta();
+		r.setDisplayName(ChatColor.YELLOW+""+ChatColor.BOLD+"Rogue Class");
+		lore = new ArrayList<String>();
+		lore.add(ChatColor.GRAY+"Attack:  "+A+A+A+A+A+A+A+A+A+A);
+		lore.add(ChatColor.GRAY+"Defence: "+D+D+D+D+D+D+E+E+E+E);
+		lore.add(ChatColor.GRAY+"Range:   "+R+R+E+E+E+E+E+E+E+E);
+		lore.add("");
+		lore.add(ChatColor.GRAY+""+ChatColor.ITALIC+"Click to select this class");
+		r.setLore(lore);
+		rogue.setItemMeta(r);
+		
+		ItemMeta w = warrior.getItemMeta();
+		w.setDisplayName(ChatColor.YELLOW+""+ChatColor.BOLD+"Warrior Class");
+		lore = new ArrayList<String>();
+		lore.add(ChatColor.GRAY+"Attack:  "+A+A+A+A+A+A+A+E+E+E);
+		lore.add(ChatColor.GRAY+"Defence: "+D+D+D+D+D+D+D+D+D+D);
+		lore.add(ChatColor.GRAY+"Range:   "+R+E+E+E+E+E+E+E+E+E);
+		lore.add("");
+		lore.add(ChatColor.GRAY+""+ChatColor.ITALIC+"Click to select this class");
+		w.setLore(lore);
+		warrior.setItemMeta(w);
+		
+		inv.setItem(10, removeAttributes(mage));
+		inv.setItem(12, removeAttributes(archer));
+		inv.setItem(14, removeAttributes(rogue));
+		inv.setItem(16, removeAttributes(warrior));
+		
+		player.openInventory(inv);
+	}
+	
+	@EventHandler
+	public void onInvClose(InventoryCloseEvent ev){
+		if(!(ev.getPlayer() instanceof Player))
+			return;
+		
+		final Inventory inv = ev.getInventory();
+		final Player p = (Player)ev.getPlayer();
+		
+		if((inv.getTitle().equalsIgnoreCase("Character Selection") || inv.getTitle().equalsIgnoreCase("Select a Class")) && locked.contains(p)){
+			new BukkitRunnable(){
+				public void run(){
+					locked.remove(p);
+					openClassSelection(p);
+				}
+			}.runTaskLater(plugin, 1);
+			
+			return;
+		}
+		
+		if(ev.getInventory().getType() != InventoryType.CRAFTING)
+			return;
+		
+		String uuid = p.getUniqueId().toString();
+		String type = kLifeAPI.type(uuid);
+		checkHealth(p, uuid, type);
+	}
+	
+	/*
+	 * 
+	 * 
+	 * ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * ARROW REMOVER ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * 
+	 * 
+	 */
 	
 	@EventHandler
 	public void onProjectileHit(ProjectileHitEvent ev){
@@ -115,76 +390,180 @@ public class Mechanics extends JavaPlugin implements Listener{
 			ent.remove();
 	}
 	
-	@EventHandler
-	public void onPlayerAutoHeal(EntityRegainHealthEvent ev){
-		if(ev.getEntity() instanceof Player && ev.getRegainReason().equals(RegainReason.SATIATED))
-			ev.setCancelled(true);
-	}
 	/*
-	@EventHandler
-	public void onInteract(PlayerInteractEvent ev){
-		if(ev.getAction() == Action.RIGHT_CLICK_AIR || ev.getAction() == Action.RIGHT_CLICK_BLOCK){
-			if(ev.getItem() != null && ev.getItem().getType() == Material.POTION){
-				ev.setCancelled(true);
-				
-			}
-		}
-	}*/
+	 * 
+	 * ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * CUSTOM ARMOR |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * 
+	 */
 	
-	@EventHandler
+	@EventHandler (priority = EventPriority.HIGHEST)
+	public void onPlayerAutoHeal(EntityRegainHealthEvent ev){
+		if(ev.getEntity() instanceof Player && ev.getRegainReason() == RegainReason.SATIATED){
+			final Player player = (Player)ev.getEntity();
+			double cH = player.getHealth();
+			double mH = player.getMaxHealth();
+			if(cH >= 0.9*mH){
+				ev.setAmount(mH-cH);
+			}
+			else {
+				ev.setAmount(0.1*mH);
+			}
+			
+			new BukkitRunnable(){
+				public void run(){
+					showHealth(player);
+				}
+			}.runTaskLater(this, 1);
+		}
+	}
+	
+	@EventHandler (priority = EventPriority.MONITOR)
 	public void onPlayerHurt(EntityDamageEvent ev){
 		if(ev.getEntity() instanceof Player){
 			final Player player = (Player) ev.getEntity();
-			
-			if(healCoolTimer == null)
-				player.setMetadata("healCool", new FixedMetadataValue(this, false));
-			else
-				healCoolTimer.cancel();
-			
-			healCoolTimer = new BukkitRunnable(){
+			new BukkitRunnable(){
 				public void run(){
-					player.setMetadata("healCool", new FixedMetadataValue(plugin, true));
-					healCoolTimer = null;
-					this.cancel();
+					String uuid = player.getUniqueId().toString();
+					String type = kLifeAPI.type(uuid);
+					checkHealth(player, uuid, type);
 				}
-			}.runTaskLater(this, 100);
-			
+			}.runTaskLater(this, 1);
 		}
 	}
 	
 	@EventHandler
-	public void onInvClose(final InventoryCloseEvent ev){
-		final Inventory inv = ev.getInventory();
-		String type = kLifeAPI.type(ev.getPlayer().getUniqueId().toString());
-		if(inv.getTitle().equalsIgnoreCase("Character Selection") && type.equals("null")){
-			new BukkitRunnable(){
-				public void run(){
-					ev.getPlayer().openInventory(inv);
-				}
-			}.runTaskLater(plugin, 1);
+	public void onPlayerJoin(final PlayerJoinEvent ev){
+		new BukkitRunnable(){
+			public void run(){
+				String uuid = ev.getPlayer().getUniqueId().toString();
+				String type = kLifeAPI.type(uuid);
+				checkHealth(ev.getPlayer(), uuid, type);
+			}
+		}.runTaskLater(this, 1);
+	}
+	
+	private void checkHealth(Player p, String uuid, String type){
+		ItemStack[] armor = p.getInventory().getArmorContents();
+		double health = 20.0;
+		for(ItemStack piece : armor)
+			health += readHealth(piece, kLifeAPI.level(uuid, type)) * 2;
+		p.setMaxHealth(health);
+		p.setHealthScale(20);
+		showHealth(p);
+	}
+	
+	private void showHealth(Player p){
+		sendActionBar(p, ChatColor.DARK_RED + "\u2764 "+ChatColor.RED+"Health: "+(int)p.getHealth()/2+"/"+(int)p.getMaxHealth()/2);
+	}
+	
+	private void sendActionBar(Player player, String message){
+        CraftPlayer p = (CraftPlayer) player;
+        IChatBaseComponent cbc = ChatSerializer.a("{\"text\": \"" + message + "\"}");
+        PacketPlayOutChat ppoc = new PacketPlayOutChat(cbc, (byte)2);
+        ((CraftPlayer) p).getHandle().playerConnection.sendPacket(ppoc);
+    }
+	
+	private double readHealth(ItemStack armor, int level){
+		List<String> lore = null;
+		
+		try {
+			lore = armor.getItemMeta().getLore();
 		}
-		else if(inv.getTitle().equalsIgnoreCase("Select a Class") && type.equals("selclass")){
-			new BukkitRunnable(){
-				public void run(){
-					Bukkit.getServer().dispatchCommand(Bukkit.getConsoleSender(), "chr " + ev.getPlayer().getName() + " null");
-					//ev.getPlayer().openInventory(inv);
+		catch (NullPointerException e){
+			return 0;
+		}
+		
+		if(lore == null)
+			return 0;
+		
+		double def = 0;
+		for(String line : lore){
+			if(line.contains("Defence")){
+				def = Double.parseDouble(line.substring(line.lastIndexOf(":")+2));
+			}
+			else if(line.contains("Level")){
+				if(level < Integer.parseInt(line.substring(line.lastIndexOf(":")+2)))
+					return 0;
+				else
+					return def;
+			}
+		}
+		return 0;
+	}
+	
+	@EventHandler (priority = EventPriority.MONITOR)
+	public void onClickMonitor(PlayerInteractEvent ev){
+		if(ev.getAction() == Action.RIGHT_CLICK_AIR || ev.getAction() == Action.RIGHT_CLICK_BLOCK){
+			final Player player = ev.getPlayer();
+			ItemStack hand = player.getInventory().getItemInHand();
+			if(hand != null){
+				String iT = hand.getType().toString();
+				if(iT.contains("BOOTS") || iT.contains("LEGGINGS") || iT.contains("CHESTPLATE") || iT.contains("HELMET")){
+					final String uuid = player.getUniqueId().toString();
+					final String type = kLifeAPI.type(uuid);
+					new BukkitRunnable(){
+						public void run(){
+							checkHealth(player, uuid, type);
+						}
+					}.runTaskLater(this, 1);
 				}
-			}.runTaskLater(plugin, 1);
+			}
 		}
 	}
+	
+	@EventHandler (priority = EventPriority.MONITOR)
+	public void onPlayerDeath(PlayerDeathEvent ev){
+		Player player = ev.getEntity();
+		String uuid = player.getUniqueId().toString();
+		String type = kLifeAPI.type(uuid);
+		checkHealth(player, uuid, type);
+	}
+	
+	/*
+	 * 
+	 * 
+	 * ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * SPELLS |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * 
+	 * 
+	 */
 	
 	@EventHandler
 	public void onStickClick(PlayerInteractEvent ev){
-		if(ev.getAction() != Action.RIGHT_CLICK_AIR && ev.getAction() != Action.RIGHT_CLICK_BLOCK){
-			final Player player = ev.getPlayer();
-			ItemStack hand = player.getInventory().getItemInHand();
+		final Player player = ev.getPlayer();
+		ItemStack hand = player.getInventory().getItemInHand();
+		if(hand == null || !hand.hasItemMeta() || !hand.getItemMeta().hasDisplayName() || !hand.getItemMeta().hasLore())
+			return;
+		
+		if(ev.getAction() != Action.RIGHT_CLICK_AIR && ev.getAction() != Action.RIGHT_CLICK_BLOCK || hand.getItemMeta().getDisplayName().contains("Machination")){
 			String type = kLifeAPI.type(player.getUniqueId().toString());
-			if(hand == null || !type.split("-")[1].equals("mage") || !hand.getType().equals(Material.STICK) || !hand.hasItemMeta() || !hand.getItemMeta().hasLore())
-				return;
+			//if(hand == null /*|| !type.split("-")[1].equals("mage")*/ || !hand.getType().equals(Material.STICK) || !hand.hasItemMeta() || !hand.getItemMeta().hasLore())
+			//	return;
 			List<String> lores = hand.getItemMeta().getLore();
 			int attack = 0;
 			for(int a = 0; a < lores.size(); a++){
 				String loreLine = ChatColor.stripColor(lores.get(a));
+				
+				if(loreLine.contains("Ability"))
+					return;
+				
 				if(loreLine.contains("Attack")){
 					String attStr = loreLine.substring(loreLine.indexOf(":")+2);
 					if(!attStr.contains("-"))
@@ -199,18 +578,32 @@ public class Mechanics extends JavaPlugin implements Listener{
 					int minLevel = Integer.parseInt(loreLine.substring(loreLine.indexOf(":")+2));
 					if(kLifeAPI.level(player.getUniqueId().toString(), type) >= minLevel){
 						ev.setCancelled(true);
-						EnumParticle[] particles = {EnumParticle.CLOUD, EnumParticle.CRIT_MAGIC, EnumParticle.SPELL_WITCH, EnumParticle.VILLAGER_HAPPY};
-						createHelix(player, particles[(int)Math.floor(Math.random()*particles.length)], attack);
+						//EnumParticle[] particles = {EnumParticle.CLOUD, EnumParticle.CRIT_MAGIC, EnumParticle.SPELL_WITCH, EnumParticle.VILLAGER_HAPPY};
+						//createHelix(player, particles[(int)Math.floor(Math.random()*particles.length)], attack);
+						Location loc = player.getEyeLocation();
+						spells.launchSpell(player, ChatColor.stripColor(hand.getItemMeta().getDisplayName()), loc, loc.getDirection());
 						return;
 					}
-					//else {
-					//	player.sendMessage(ChatColor.RED+"You must be of level "+minLevel+" to use this weapon!");
-					//	return;
-					//}
 				}
 			}
 		}
 	}
+	
+	/*
+	 * 
+	 * 
+	 * ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * TELEPORTATION EFFECTS ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * 
+	 * 
+	 */
 	
 	@EventHandler
 	public void onTeleport(PlayerTeleportEvent ev){
@@ -260,18 +653,6 @@ public class Mechanics extends JavaPlugin implements Listener{
 		return Math.sqrt(Math.pow(maxRadius,2) - Math.pow(time-maxRadius, 2));
 	}
 	
-	private void heal(){
-		List<Player> playerList = (List<Player>)Bukkit.getServer().getOnlinePlayers();
-		for(Player player: playerList){
-			if(!player.hasMetadata("healCool") || player.getMetadata("healCool").size() == 0 || player.getMetadata("healCool").get(0).asBoolean()){
-				if(player.getHealth() >= 0.9*player.getMaxHealth())
-					player.setHealth(player.getMaxHealth());
-				else
-					player.setHealth(player.getHealth()+0.1*player.getMaxHealth());
-			}
-		}
-	}
-	
 	private double xPos(double velocity, double yaw, double pitch, double time, double initialX){
 		return -1 * velocity * Math.cos(Math.PI/180*pitch) * time * Math.sin(Math.PI/180*yaw) + initialX;
 	}
@@ -284,6 +665,21 @@ public class Mechanics extends JavaPlugin implements Listener{
 		return velocity * Math.cos(Math.PI/180*pitch) * time * Math.cos(Math.PI/180*yaw) + initialZ;
 	}
 	
+	/*
+	 * 
+	 * 
+	 * ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * HELIX SPELL ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * 
+	 * 
+	 */
 	
 	private void createHelix(final Player player, final EnumParticle particle, final int damage) {
 		final Location loc = player.getEyeLocation();
@@ -331,6 +727,21 @@ public class Mechanics extends JavaPlugin implements Listener{
 	    }.runTaskTimer(this, 0, 1);
 	}
 	
+	/*
+	 * 
+	 * 
+	 * ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * STRAIGHT SPELL |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * 
+	 * 
+	 */
 	private void straightSpell(final Player player){
 		final Double[] time = new Double[1];
 		final Location[] loc = new Location[1];
@@ -373,5 +784,147 @@ public class Mechanics extends JavaPlugin implements Listener{
 			}
 		}.runTaskTimer(this, 0, period);
 		
+	}
+	
+	/*
+	 * 
+	 * 
+	 * ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * HOVERABLE WEAPON INFO  |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * CHAT BOT  |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+	 * 
+	 * 
+	 */
+	
+
+	@EventHandler
+	public void onChatEvent(final AsyncPlayerChatEvent ev){
+		final String message = ev.getMessage();
+		final Player player = ev.getPlayer();
+		
+		if(message.contains(";weapon")){
+			
+			String uuid = player.getUniqueId().toString();
+
+			ChatMessage nMsg = new ChatMessage(kLifeAPI.karmaTitleName(uuid, player.getName())+ChatColor.GRAY+" > ");
+			String[] words = message.split(" ");
+			for(String word : words){
+				if(word.contains(";weapon"))
+					nMsg.addSibling(hoverableWeapon(player));
+				else
+					nMsg.addSibling(new ChatMessage(word));
+				nMsg.addSibling(new ChatMessage(" "));
+			}
+			
+			ev.setCancelled(true);
+			
+			for(Player p : ev.getRecipients())
+				((CraftPlayer)p).getHandle().sendMessage(nMsg);
+		}
+		
+		if(message.toLowerCase().contains("thirsty")){
+			new BukkitRunnable(){
+				public void run(){
+					player.sendMessage(ChatColor.AQUA+"Jimmy "+ChatColor.GRAY+"> "+ChatColor.WHITE + "Would you like something to drink?");
+					
+					new BukkitRunnable(){
+						public void run(){
+							player.sendMessage(ChatColor.GRAY+""+ChatColor.ITALIC+"Jimmy opens the fridge.");
+							
+							new BukkitRunnable(){
+								public void run(){
+									player.sendMessage(ChatColor.AQUA+"Jimmy "+ChatColor.GRAY+"> "+ChatColor.WHITE + "We have water, milk, juice, spiders, and soda.");
+								}
+							}.runTaskLater(plugin, 30);
+						}
+					}.runTaskLater(plugin, 30);
+				}
+			}.runTaskLater(this, 30);
+			
+			ev.setCancelled(true);
+			
+			player.sendMessage(kLifeAPI.karmaTitleName(player.getUniqueId().toString(), player.getName())+ChatColor.GRAY+" > " + ChatColor.WHITE + message);
+		}
+		else if(message.toLowerCase().equals("spiders?")){
+			new BukkitRunnable(){
+				public void run(){
+					player.sendMessage(ChatColor.AQUA+"Jimmy "+ChatColor.GRAY+"> "+ChatColor.WHITE + "Spiders it is, then!");
+					
+					new BukkitRunnable(){
+						public void run(){
+							player.sendMessage(ChatColor.GRAY+""+ChatColor.ITALIC+"You tried to interject, but he was already pouring you a brimming glass of spiders.");
+							
+							new BukkitRunnable(){
+								public void run(){
+									player.sendMessage(ChatColor.AQUA+"Jimmy "+ChatColor.GRAY+"> "+ChatColor.WHITE + "Enjoy! :)");
+								}
+							}.runTaskLater(plugin, 30);
+						}
+					}.runTaskLater(plugin, 30);
+				}
+			}.runTaskLater(plugin, 30);
+			
+			ev.setCancelled(true);
+			player.sendMessage(kLifeAPI.karmaTitleName(player.getUniqueId().toString(), player.getName())+ChatColor.GRAY+" > " + ChatColor.WHITE + message);
+		}
+		else if(message.toLowerCase().contains("jimmy")){
+			if(message.toLowerCase().contains("0") && message.toLowerCase().contains("divided")){
+				new BukkitRunnable(){
+					public void run(){
+						player.sendMessage(ChatColor.AQUA+"Jimmy "+ChatColor.GRAY+"> "+ChatColor.WHITE + "It's... uh... error. Yeah. It says error on my calculator.");
+					}
+				}.runTaskLater(plugin, 50);
+			}
+			
+			new BukkitRunnable(){
+				public void run(){
+					player.sendMessage(ChatColor.AQUA+"Jimmy "+ChatColor.GRAY+"> "+ChatColor.WHITE + jimmy.generateMessage(message, ev.getPlayer()));
+				}
+			}.runTaskLater(this, 20);
+			
+			ev.setCancelled(true);
+			player.sendMessage(kLifeAPI.karmaTitleName(player.getUniqueId().toString(), player.getName())+ChatColor.GRAY+" > " + ChatColor.WHITE + message);
+		}
+		
+		
+	}
+		
+	private IChatBaseComponent hoverableWeapon(Player player){
+		net.minecraft.server.v1_8_R3.ItemStack inHand = org.bukkit.craftbukkit.v1_8_R3.inventory.CraftItemStack.asNMSCopy((CraftItemStack)player.getItemInHand());
+		return toText(inHand, player.getItemInHand());
+	}
+	
+	private IChatBaseComponent toText(net.minecraft.server.v1_8_R3.ItemStack item, ItemStack origI){
+		ChatComponentText var1 = new ChatComponentText(item.getName());
+	      if(item.hasName()) {
+	         var1.getChatModifier().setItalic(Boolean.valueOf(true));
+	      }
+	      
+	      String color;
+	      try {
+	    	  color = ChatColor.getLastColors(origI.getItemMeta().getDisplayName());
+	      }
+	      catch (NullPointerException e){
+	    	  color = ChatColor.WHITE+"";
+	      }
+	      
+	      ChatComponentText b1 = new ChatComponentText(color+"[");
+	      ChatComponentText b2 = new ChatComponentText(color+"]");
+	      IChatBaseComponent var2 = b1.addSibling(var1).addSibling(b2);
+	      
+	      if(item != null) {
+	         NBTTagCompound var3 = new NBTTagCompound();
+	         item.save(var3);
+	         var2.getChatModifier().setChatHoverable(new ChatHoverable(ChatHoverable.EnumHoverAction.SHOW_ITEM, new ChatComponentText(var3.toString())));
+	      }
+
+	      return var2;
 	}
 }

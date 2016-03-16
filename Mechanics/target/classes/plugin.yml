@@ -6,3 +6,9 @@ commands:
   johnCena:
     description: Plays My Time is Now by John Cena.
     usage: /<command>
+  class:
+    description: Opens the class selection GUI.
+    usage: /<command>
+  lightshow:
+    description: Starts a spell lightshow.
+    usage: /<command> <radius> <length>
